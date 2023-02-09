@@ -1,0 +1,14 @@
+[package]
+name = "gdsii_to_gerber"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.69"
+conv = "0.3.3"
+gds21 = "0.2.0"
+gerber-types = "0.3.0"
+itertools = "0.10.5"
+thiserror = "1.0.38"
