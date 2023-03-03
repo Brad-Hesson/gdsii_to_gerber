@@ -1,21 +1,35 @@
 use std::{
     fs::File,
     io::{BufWriter, Write},
+    path::PathBuf,
 };
 
 use anyhow::Result;
+use clap::Parser;
 use gds21::{GdsElement, GdsLibrary, GdsPoint, GdsStructRef};
 use gerber_types::{CoordinateNumber, GerberResult};
 use thiserror::Error;
 
+#[derive(Parser, Debug)]
+struct Args {
+    /// File path of gdsii file
+    file: PathBuf,
+    /// Name of the cell to generate files for
+    pattern: String,
+    /// Layers to generate files for
+    #[arg(default_value = "1")]
+    layers: Vec<i16>,
+}
+
 fn main() -> Result<()> {
-    let lib =
-        gds21::GdsLibrary::load(r#"C:\Users\slice\code\actuator-project\klayout\stencil.GDS"#)
-            .unwrap();
-    let name = "300um";
-    let pat = Pattern::from_gds_struct(&lib, name)?;
-    let mut w = BufWriter::new(File::create(format!("{name}.pcb"))?);
-    pat.write_gerber(&mut w, &lib)?;
+    let args = Args::parse();
+    let lib = gds21::GdsLibrary::load(args.file).unwrap();
+    let name = args.pattern;
+    for layer in args.layers{
+        let pat = Pattern::from_gds_struct(&lib, &name, layer)?;
+        let mut w = BufWriter::new(File::create(format!("{name}_{layer}.g"))?);
+        pat.write_gerber(&mut w, &lib)?;
+    }
     Ok(())
 }
 
@@ -23,7 +37,7 @@ fn main() -> Result<()> {
 struct Pattern(Vec<Region>);
 
 impl Pattern {
-    fn from_gds_struct(lib: &GdsLibrary, name: &str) -> PatternResult<Self> {
+    fn from_gds_struct(lib: &GdsLibrary, name: &str, layer: i16) -> PatternResult<Self> {
         let struc = lib
             .structs
             .iter()
@@ -32,12 +46,16 @@ impl Pattern {
         let mut regions: Vec<Region> = vec![];
         for elem in &struc.elems {
             match elem {
-                GdsElement::GdsBoundary(b) => regions.push(b.xy.iter().collect()),
+                GdsElement::GdsBoundary(b) if b.layer == layer => {
+                    regions.push(b.xy.iter().collect())
+                }
+                GdsElement::GdsBoundary(_) => {}
                 GdsElement::GdsStructRef(GdsStructRef { name, xy, .. }) => {
-                    let pat = Pattern::from_gds_struct(lib, name)? + xy.into();
+                    let pat = Pattern::from_gds_struct(lib, name, layer)? + xy.into();
                     regions.extend(pat.0);
                 }
-                _ => unimplemented!(),
+                GdsElement::GdsTextElem(_) => {}
+                _ => unimplemented!("{elem:?}"),
             }
         }
         Ok(Self(regions))
