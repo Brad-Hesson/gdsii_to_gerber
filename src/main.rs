@@ -13,9 +13,9 @@ use thiserror::Error;
 #[derive(Parser, Debug)]
 struct Args {
     /// File path of gdsii file
-    file: PathBuf,
+    path: PathBuf,
     /// Name of the cell to generate files for
-    pattern: String,
+    cell: String,
     /// Layers to generate files for
     #[arg(default_value = "1")]
     layers: Vec<i16>,
@@ -23,11 +23,13 @@ struct Args {
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    let lib = gds21::GdsLibrary::load(args.file).unwrap();
-    let name = args.pattern;
-    for layer in args.layers{
-        let pat = Pattern::from_gds_struct(&lib, &name, layer)?;
-        let mut w = BufWriter::new(File::create(format!("{name}_{layer}.g"))?);
+    let path = args.path;
+    let filename = path.file_stem().unwrap().to_str().unwrap();
+    let lib = gds21::GdsLibrary::load(&path).unwrap();
+    let cell = args.cell;
+    for layer in args.layers {
+        let pat = Pattern::from_gds_struct(&lib, &cell, layer)?;
+        let mut w = BufWriter::new(File::create(format!("{filename}_{cell}_{layer}.g",))?);
         pat.write_gerber(&mut w, &lib)?;
     }
     Ok(())
